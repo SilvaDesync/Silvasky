@@ -21,7 +21,7 @@ jobs:
           npm run build
 
       - name: Upload Executavel
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ErrorCollector-Portable
           path: dist/*.exe
