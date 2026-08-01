@@ -2,178 +2,74 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Error Collector Desktop</title>
+  <title>Coletor Global</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #121212;
-      color: #e0e0e0;
-      height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #181818;
+      color: #fff;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      height: 100vh;
     }
-    header {
-      background-color: #1f1f1f;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      border-bottom: 1px solid #333;
-    }
-    .url-bar {
-      flex: 1;
-      display: flex;
-      gap: 8px;
-    }
-    input[type="text"] {
-      flex: 1;
-      background-color: #2a2a2a;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
+    .card {
+      background: #252525;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
     }
     button {
-      background-color: #2b5c8f;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s;
-    }
-    button:hover { background-color: #3a75b3; }
-    button.btn-danger { background-color: #d32f2f; }
-    button.btn-danger:hover { background-color: #f44336; }
-    button.btn-success { background-color: #2e7d32; }
-    button.btn-success:hover { background-color: #388e3c; }
-
-    .main-container {
-      display: flex;
-      flex: 1;
-      height: calc(100vh - 60px);
-    }
-    .browser-view {
-      flex: 2;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #333;
-    }
-    webview {
       width: 100%;
-      height: 100%;
-    }
-    .sidebar {
-      flex: 1;
-      max-width: 450px;
-      background-color: #181818;
-      display: flex;
-      flex-direction: column;
-    }
-    .controls-card {
-      padding: 16px;
-      border-bottom: 1px solid #333;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: #202020;
-    }
-    .control-group {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    select {
-      background: #2a2a2a;
-      color: white;
-      border: 1px solid #444;
-      padding: 6px;
-      border-radius: 4px;
-      width: 60%;
-    }
-    .logs-panel {
-      flex: 1;
       padding: 12px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-record { background: #e53935; color: white; }
+    .btn-mic { background: #2e7d32; color: white; }
+    .logs {
+      flex: 1;
+      background: #111;
+      border-radius: 6px;
+      padding: 8px;
       overflow-y: auto;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 11px;
     }
     .log-item {
-      padding: 8px;
-      margin-bottom: 8px;
-      border-radius: 4px;
-      background-color: #222;
-      border-left: 4px solid #888;
+      padding: 6px;
+      margin-bottom: 6px;
+      background: #222;
+      border-left: 3px solid #2196F3;
+      border-radius: 3px;
       word-break: break-all;
     }
-    .log-item.NAVIGATION { border-color: #2196F3; }
-    .log-item.CONSOLE_ERROR { border-color: #F44336; background: #2a1818; }
-    .log-item.HTTP_ERROR { border-color: #FF9800; }
-    .log-item.EXTERNAL_APP_CONSOLE { border-color: #9C27B0; background: #231628; }
-    .log-item .time { color: #888; font-size: 10px; display: block; margin-bottom: 4px; }
+    .log-item.CONSOLE_ERROR { border-color: #f44336; }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="url-bar">
-      <input type="text" id="url-input" value="https://google.com" placeholder="Digite a URL (ex: https://multipedidos.com)">
-      <button id="btn-go">Navegar</button>
-    </div>
-  </header>
-
-  <div class="main-container">
-    <!-- NAVEGADOR EMBUTIDO -->
-    <div class="browser-view">
-      <webview id="web-view" src="https://google.com" allowpopups></webview>
-    </div>
-
-    <!-- PAINEL DE CONTROLE E LOGS -->
-    <div class="sidebar">
-      <div class="controls-card">
-        <h3>📹 Gravação de Tela & Microfone</h3>
-        
-        <div class="control-group">
-          <label>Fonte de Vídeo:</label>
-          <select id="select-source">
-            <option value="screen">Tela Inteira (Desktop)</option>
-          </select>
-        </div>
-
-        <div class="control-group">
-          <label>Microfone:</label>
-          <button id="btn-toggle-mic" class="btn-success">🎤 Mic ON</button>
-        </div>
-
-        <button id="btn-record" class="btn-danger" style="padding: 12px; font-size: 15px;">🔴 Iniciar Gravação</button>
-
-        <hr style="border-color: #333; margin: 4px 0;">
-
-        <h3>🔌 App Externo (Gestor Multipedidos)</h3>
-        <div class="control-group">
-          <input type="text" id="port-input" value="9222" placeholder="Porta CDP (ex: 9222)" style="width: 40%;">
-          <button id="btn-connect-app">Conectar Console</button>
-        </div>
-      </div>
-
-      <div style="padding: 8px 16px; background: #151515; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: bold; font-size: 13px;">📜 Histórico Unificado de Erros</span>
-        <button id="btn-clear" style="padding: 4px 8px; font-size: 11px;">Limpar</button>
-      </div>
-
-      <div id="logs-container" class="logs-panel">
-        <div class="log-item SYSTEM">
-          <span class="time">SISTEMA</span>
-          Sessão iniciada. Os erros e trocas de página serão mantidos nesta lista contínua.
-        </div>
-      </div>
-    </div>
+  <div class="card">
+    <h3>🔴 Gravação da Tela Inteira</h3>
+    <button id="btn-mic" class="btn-mic">🎤 Microfone: ON</button>
+    <button id="btn-record" class="btn-record">Iniciar Gravação Global</button>
   </div>
+
+  <div class="card" style="font-size: 12px; background: #332b00; color: #ffeb3b;">
+    💡 <b>Como conectar abas do Chrome/Edge:</b><br>
+    Arraste o botão do coletor para a barra de favoritos do navegador ou clique no script de injeção quando abrir uma página.
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+    <span>📜 Histórico Unificado de Logs</span>
+    <button id="btn-clear" style="width: auto; padding: 4px 8px; margin: 0;">Limpar</button>
+  </div>
+
+  <div id="logs" class="logs"></div>
 
   <script src="renderer.js"></script>
 </body>
