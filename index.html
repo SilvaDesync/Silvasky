@@ -2,74 +2,74 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Coletor Global</title>
+  <title>Coletor Automático</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
       background: #181818;
       color: #fff;
-      padding: 12px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
       height: 100vh;
     }
-    .card {
-      background: #252525;
-      padding: 12px;
+    .header-status {
+      background: #232323;
+      padding: 10px;
       border-radius: 8px;
       margin-bottom: 12px;
+      font-size: 13px;
+      border-left: 4px solid #4caf50;
     }
     button {
       width: 100%;
-      padding: 12px;
+      padding: 14px;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-weight: bold;
+      font-size: 15px;
       cursor: pointer;
-      margin-top: 8px;
+      margin-bottom: 10px;
     }
-    .btn-record { background: #e53935; color: white; }
-    .btn-mic { background: #2e7d32; color: white; }
-    .logs {
+    .btn-record { background: #ff4d29; color: white; }
+    .btn-mic { background: #333; color: #ccc; font-size: 13px; padding: 8px; }
+    .btn-mic.active { background: #2e7d32; color: white; }
+    .logs-box {
       flex: 1;
-      background: #111;
-      border-radius: 6px;
-      padding: 8px;
+      background: #101010;
+      border-radius: 8px;
+      padding: 10px;
       overflow-y: auto;
       font-family: monospace;
       font-size: 11px;
     }
     .log-item {
-      padding: 6px;
+      padding: 6px 8px;
       margin-bottom: 6px;
       background: #222;
       border-left: 3px solid #2196F3;
-      border-radius: 3px;
-      word-break: break-all;
+      border-radius: 4px;
     }
-    .log-item.CONSOLE_ERROR { border-color: #f44336; }
+    .log-item.CONSOLE_ERROR { border-color: #f44336; background: #2a1515; }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <h3>🔴 Gravação da Tela Inteira</h3>
-    <button id="btn-mic" class="btn-mic">🎤 Microfone: ON</button>
-    <button id="btn-record" class="btn-record">Iniciar Gravação Global</button>
+  <div class="header-status">
+    🟢 <b>Modo Automático Ativo</b><br>
+    <span style="color: #aaa; font-size: 11px;">Basta clicar na página ou programa desejado para iniciar a coleta.</span>
   </div>
 
-  <div class="card" style="font-size: 12px; background: #332b00; color: #ffeb3b;">
-    💡 <b>Como conectar abas do Chrome/Edge:</b><br>
-    Arraste o botão do coletor para a barra de favoritos do navegador ou clique no script de injeção quando abrir uma página.
-  </div>
+  <button id="btn-mic" class="btn-mic active">🎤 Microfone: LIGADO</button>
+  <button id="btn-record" class="btn-record">🔴 Iniciar Gravação</button>
 
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-    <span>📜 Histórico Unificado de Logs</span>
-    <button id="btn-clear" style="width: auto; padding: 4px 8px; margin: 0;">Limpar</button>
+    <span style="font-size: 12px; color: #aaa;">Histórico Único da Sessão:</span>
+    <button id="btn-clear" style="width: auto; padding: 4px 8px; font-size: 11px; margin: 0; background: #444;">Limpar</button>
   </div>
 
-  <div id="logs" class="logs"></div>
+  <div id="logs" class="logs-box"></div>
 
   <script src="renderer.js"></script>
 </body>
