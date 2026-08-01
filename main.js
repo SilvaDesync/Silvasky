@@ -1,12 +1,11 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, dialog } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { exec } = require('child_process');
 const http = require('http');
 const WebSocket = require('ws');
 
 let mainWindow;
 let sessionLogs = [];
-let launchedProcess = null;
 let activeDebuggerWs = null;
 
 function createWindow() {
@@ -15,6 +14,7 @@ function createWindow() {
     height: 650,
     title: "Error Collector Launcher",
     alwaysOnTop: true,
+    resizable: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -32,34 +32,38 @@ function addLog(logData) {
   }
 }
 
-// 1. Lógica para Abrir o Programa/Atalho e injetar o coletor de erros
+// 1. Executa Atalhos (.lnk), Executáveis (.exe) e injeta a porta de depuração do Windows
 ipcMain.handle('launch-app-and-collect', async (event, appPath) => {
-  try {
+  return new Promise((resolve) => {
     const debugPort = 9222;
+    const formattedPath = `"${appPath}"`;
+    const command = `cmd.exe /c start "" ${formattedPath} --remote-debugging-port=${debugPort}`;
 
-    // Executa o aplicativo/navegador inserindo a flag de depuração de forma transparente
-    launchedProcess = spawn(appPath, [`--remote-debugging-port=${debugPort}`], {
-      detached: true,
-      stdio: 'ignore'
+    exec(command, (error) => {
+      if (error) {
+        console.error("Erro ao abrir programa:", error);
+        addLog({
+          type: 'SYSTEM',
+          timestamp: new Date().toISOString(),
+          message: `❌ Erro ao abrir: ${error.message}`
+        });
+        resolve({ success: false, error: error.message });
+      } else {
+        addLog({
+          type: 'SYSTEM',
+          timestamp: new Date().toISOString(),
+          message: `🚀 Programa iniciado: ${path.basename(appPath)}`
+        });
+        
+        // Tenta conectar à escuta de logs do app aberto
+        connectToLaunchedApp(debugPort);
+        resolve({ success: true });
+      }
     });
-    launchedProcess.unref();
-
-    addLog({
-      type: 'SYSTEM',
-      timestamp: new Date().toISOString(),
-      message: `🚀 Programa iniciado: ${path.basename(appPath)}`
-    });
-
-    // Inicia a tentativa de conexão com o console do app aberto
-    connectToLaunchedApp(debugPort);
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  });
 });
 
-// Seleção de arquivo via caixa de diálogo caso o usuário prefira clicar
+// Seleção manual de arquivo (Caixa de Diálogo)
 ipcMain.handle('select-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
@@ -70,9 +74,16 @@ ipcMain.handle('select-file', async () => {
   return result.filePaths[0] || null;
 });
 
-// 2. Conexão via WebSocket CDP no programa aberto
+// 2. Conecta automaticamente ao Console do Programa aberto via WebSocket (CDP)
 function connectToLaunchedApp(port, retries = 10) {
-  if (retries === 0) return;
+  if (retries === 0) {
+    addLog({
+      type: 'SYSTEM',
+      timestamp: new Date().toISOString(),
+      message: '⚠️ Programa aberto, mas sem suporte a depuração remota (porta 9222).'
+    });
+    return;
+  }
 
   setTimeout(() => {
     http.get(`http://127.0.0.1:${port}/json`, (res) => {
@@ -117,6 +128,7 @@ function startCDPListener(wsUrl) {
   activeDebuggerWs.on('message', (messageStr) => {
     const msg = JSON.parse(messageStr);
     
+    // Erros do Console (console.error)
     if (msg.method === 'Console.messageAdded' && msg.params.message.level === 'error') {
       addLog({
         type: 'CONSOLE_ERROR',
@@ -126,6 +138,7 @@ function startCDPListener(wsUrl) {
       });
     }
 
+    // Exceções não tratadas do JavaScript
     if (msg.method === 'Runtime.exceptionThrown') {
       addLog({
         type: 'CONSOLE_ERROR',
@@ -136,13 +149,19 @@ function startCDPListener(wsUrl) {
   });
 }
 
+// Pega a tela para gravação de vídeo
 ipcMain.handle('get-desktop-sources', async () => {
   return await desktopCapturer.getSources({ types: ['screen'] });
 });
 
+// Limpa o histórico de logs
 ipcMain.handle('clear-logs', () => {
   sessionLogs = [];
   return true;
 });
 
 app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
