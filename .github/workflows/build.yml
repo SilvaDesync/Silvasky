@@ -1,0 +1,27 @@
+name: Gerar Executavel Windows
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install & Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Upload Executavel
+        uses: actions/upload-artifact@v3
+        with:
+          name: ErrorCollector-Portable
+          path: dist/*.exe
