@@ -1,19 +1,20 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, dialog } = require('electron');
 const path = require('path');
+const { spawn } = require('child_process');
 const http = require('http');
 const WebSocket = require('ws');
 
 let mainWindow;
 let sessionLogs = [];
+let launchedProcess = null;
 let activeDebuggerWs = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 600,
-    title: "Error Collector Automático",
-    alwaysOnTop: true, // Fica flutuando no canto da tela para facilitar
-    resizable: false,
+    width: 450,
+    height: 650,
+    title: "Error Collector Launcher",
+    alwaysOnTop: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -22,9 +23,6 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
-  
-  // Inicia o monitoramento de conexões ativas nos navegadores
-  autoConnectToActiveBrowser();
 }
 
 function addLog(logData) {
@@ -34,62 +32,100 @@ function addLog(logData) {
   }
 }
 
-// Escuta portas de depuração padrão do Chrome/Edge (9222) automaticamente
-function autoConnectToActiveBrowser() {
-  setInterval(() => {
-    http.get('http://127.0.0.1:9222/json', (res) => {
+// 1. Lógica para Abrir o Programa/Atalho e injetar o coletor de erros
+ipcMain.handle('launch-app-and-collect', async (event, appPath) => {
+  try {
+    const debugPort = 9222;
+
+    // Executa o aplicativo/navegador inserindo a flag de depuração de forma transparente
+    launchedProcess = spawn(appPath, [`--remote-debugging-port=${debugPort}`], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    launchedProcess.unref();
+
+    addLog({
+      type: 'SYSTEM',
+      timestamp: new Date().toISOString(),
+      message: `🚀 Programa iniciado: ${path.basename(appPath)}`
+    });
+
+    // Inicia a tentativa de conexão com o console do app aberto
+    connectToLaunchedApp(debugPort);
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Seleção de arquivo via caixa de diálogo caso o usuário prefira clicar
+ipcMain.handle('select-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Executáveis e Atalhos', extensions: ['exe', 'lnk', 'app'] }
+    ]
+  });
+  return result.filePaths[0] || null;
+});
+
+// 2. Conexão via WebSocket CDP no programa aberto
+function connectToLaunchedApp(port, retries = 10) {
+  if (retries === 0) return;
+
+  setTimeout(() => {
+    http.get(`http://127.0.0.1:${port}/json`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
           const targets = JSON.parse(data);
-          // Pega a aba/página que está visível/focada no momento
-          const activePage = targets.find(t => t.type === 'page');
+          const activeTarget = targets.find(t => t.type === 'page' || t.type === 'app');
 
-          if (activePage && activePage.webSocketDebuggerUrl) {
-            connectCDP(activePage.webSocketDebuggerUrl, activePage.title, activePage.url);
+          if (activeTarget && activeTarget.webSocketDebuggerUrl) {
+            startCDPListener(activeTarget.webSocketDebuggerUrl);
+          } else {
+            connectToLaunchedApp(port, retries - 1);
           }
-        } catch (e) {}
+        } catch (e) {
+          connectToLaunchedApp(port, retries - 1);
+        }
       });
     }).on('error', () => {
-      // Navegador não está com porta CDP aberta ainda
+      connectToLaunchedApp(port, retries - 1);
     });
-  }, 2000); // Verifica a cada 2 segundos a troca de janela/página
+  }, 1000);
 }
 
-function connectCDP(wsUrl, title, url) {
-  if (activeDebuggerWs && activeDebuggerWs.url === wsUrl) return; // Já conectado
-
+function startCDPListener(wsUrl) {
   if (activeDebuggerWs) activeDebuggerWs.close();
 
   activeDebuggerWs = new WebSocket(wsUrl);
 
   activeDebuggerWs.on('open', () => {
-    // Ativa captura de Console e Exceções na página detectada
     activeDebuggerWs.send(JSON.stringify({ id: 1, method: 'Console.enable' }));
     activeDebuggerWs.send(JSON.stringify({ id: 2, method: 'Runtime.enable' }));
     
     addLog({
       type: 'NAVIGATION',
       timestamp: new Date().toISOString(),
-      message: `🎯 Coletando automaticamente de: [${title}] (${url})`
+      message: '✅ Conectado com sucesso ao console do programa!'
     });
   });
 
   activeDebuggerWs.on('message', (messageStr) => {
     const msg = JSON.parse(messageStr);
     
-    // Captura erros de console (console.error)
     if (msg.method === 'Console.messageAdded' && msg.params.message.level === 'error') {
       addLog({
         type: 'CONSOLE_ERROR',
         timestamp: new Date().toISOString(),
         message: msg.params.message.text,
-        url: msg.params.message.url
+        url: msg.params.message.url || ''
       });
     }
 
-    // Captura erros JS não tratados (Uncaught exceptions)
     if (msg.method === 'Runtime.exceptionThrown') {
       addLog({
         type: 'CONSOLE_ERROR',
@@ -110,7 +146,3 @@ ipcMain.handle('clear-logs', () => {
 });
 
 app.whenReady().then(createWindow);
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
