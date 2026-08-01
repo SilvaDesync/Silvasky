@@ -1,22 +1,51 @@
-let isRecording = false;
-let mediaRecorder = null;
-let recordedChunks = [];
-let micEnabled = true;
-
+const dropZone = document.getElementById('drop-zone');
 const btnRecord = document.getElementById('btn-record');
-const btnMic = document.getElementById('btn-mic');
 const logsContainer = document.getElementById('logs');
 const btnClear = document.getElementById('btn-clear');
 
-btnMic.addEventListener('click', () => {
-  micEnabled = !micEnabled;
-  btnMic.textContent = micEnabled ? '🎤 Microfone: ON' : '🎙️ Microfone: OFF';
-  btnMic.className = micEnabled ? 'btn-mic' : '';
+let isRecording = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+
+// Drag and Drop de Atalhos / EXEs
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
 });
 
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    const filePath = files[0].path;
+    handleLaunch(filePath);
+  }
+});
+
+dropZone.addEventListener('click', async () => {
+  const filePath = await window.electronAPI.selectFile();
+  if (filePath) {
+    handleLaunch(filePath);
+  }
+});
+
+async function handleLaunch(filePath) {
+  dropZone.innerHTML = `⏳ Abrindo e Conectando ao App...<br><small style="color:#aaa;">${filePath}</small>`;
+  const res = await window.electronAPI.launchApp(filePath);
+  if (!res.success) {
+    alert("Erro ao abrir aplicativo: " + res.error);
+  }
+}
+
+// Gravação de Tela
 btnRecord.addEventListener('click', async () => {
   if (!isRecording) {
-    // Pega a Tela Inteira do Windows
     const sources = await window.electronAPI.getSources();
     const primaryScreen = sources[0];
 
@@ -30,14 +59,10 @@ btnRecord.addEventListener('click', async () => {
       }
     });
 
-    if (micEnabled) {
-      try {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getAudioTracks().forEach(track => stream.addTrack(track));
-      } catch (e) {
-        console.warn("Microfone não encontrado:", e);
-      }
-    }
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.getAudioTracks().forEach(track => stream.addTrack(track));
+    } catch (e) {}
 
     recordedChunks = [];
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
@@ -51,18 +76,18 @@ btnRecord.addEventListener('click', async () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gravacao_tela_global_${Date.now()}.webm`;
+      a.download = `coleta_erros_${Date.now()}.webm`;
       a.click();
     };
 
     mediaRecorder.start(1000);
     isRecording = true;
-    btnRecord.textContent = '⏹️ Parar e Salvar Gravação';
+    btnRecord.textContent = '⏹️ Parar Gravação';
     btnRecord.style.background = '#ff9800';
   } else {
     mediaRecorder.stop();
     isRecording = false;
-    btnRecord.textContent = 'Iniciar Gravação Global';
+    btnRecord.textContent = '🔴 Iniciar Gravação de Tela';
     btnRecord.className = 'btn-record';
   }
 });
@@ -72,7 +97,7 @@ window.electronAPI.onNewLog((log) => {
   div.className = `log-item ${log.type || ''}`;
   div.innerHTML = `
     <small style="color:#aaa">${new Date(log.timestamp).toLocaleTimeString()}</small>
-    <div><b>[${log.page || 'Sistema'}]</b> ${log.message}</div>
+    <div>${log.message}</div>
   `;
   logsContainer.appendChild(div);
   logsContainer.scrollTop = logsContainer.scrollHeight;
