@@ -1,0 +1,30 @@
+{
+  "name": "error-collector-desktop",
+  "version": "1.0.0",
+  "description": "Gravador de Tela e Coletor de Erros Multitelas e Apps Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "author": "Error Collector Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "build": {
+    "appId": "com.errorcollector.desktop",
+    "productName": "ErrorCollectorDesktop",
+    "win": {
+      "target": "portable",
+      "icon": "icons/icon.ico"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
